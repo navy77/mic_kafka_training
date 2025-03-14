@@ -15,8 +15,3 @@ docker exec -it kafka-1 sh -c "cd /opt/kafka/bin && /bin/bash"
 ### kafka consumer topic
  ./kafka-console-consumer.sh --bootstrap-server localhost:19092 --topic my_topic
 
-## kafka ksqlDB
-docker exec -it ksqldb-cli ksql http://ksqldb-server:8088\
-show streams;\
-show topics;\
-show tables;
