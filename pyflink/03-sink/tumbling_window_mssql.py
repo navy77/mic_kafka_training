@@ -1,35 +1,40 @@
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.table import EnvironmentSettings,StreamTableEnvironment
-from pyflink.table.expressions import lit,col
+from pyflink.table import EnvironmentSettings, StreamTableEnvironment
+from pyflink.table.expressions import lit, col
 from pyflink.table.window import Tumble
 import dotenv
 import os
 import pymssql
+from datetime import datetime
 
 dotenv.load_dotenv()
 
-def insert_into_mssql(batch_data):
-    # Connect to MSSQL using pymssql
-    print(1)
-    conn = pymssql.connect(
-        server=os.environ['MSSQL_SERVER'],
-        user=os.environ['MSSQL_USER'],
-        password=os.environ['MSSQL_PASSWORD'],
-        database=os.environ['MSSQL_DATABASE']
-    )
-    cursor = conn.cursor()
 
-    # Insert data into the table
-    for row in batch_data:
-        cursor.execute("""
-            INSERT INTO your_table (topic, window_start, window_end, g_data1, g_data2)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (row['topic'], row['window_start'], row['window_end'], row['g_data1'], row['g_data2']))
+def insert_to_mssql(data):
+    """Insert processed data into MSSQL"""
+    try:
+        # Establish connection to MSSQL
+        server="192.168.1.30"
+        user="sa"
+        password="sa$admin"
+        database="kafka"
 
-    # Commit transaction
-    conn.commit()
-    cursor.close()
-    conn.close()
+        # Connect to the SQL Server
+        conn = pymssql.connect(server=server, user=user, password=password, database=database)
+        cursor = conn.cursor()
+
+        # SQL insert query
+        insert_query = """
+        INSERT INTO my_table (topic, window_start, window_end, g_data1, g_data2, acc_data1, acc_data2, data1xdata2)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(insert_query, tuple(data)) 
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error while inserting into MSSQL: {e}")
 
 def streaming():
     # create streaming envionment
@@ -39,7 +44,7 @@ def streaming():
     tb_env = StreamTableEnvironment.create(stream_execution_environment=stream_env,
                                           environment_settings=stream_settings)
     # flink sql-connector-kafka jar path
-    jar_path = "D:\\docker\\mic_kafka\\pyflink\\flink-sql-connector-kafka-3.4.0-1.20.jar"
+    jar_path = "E:\\mic_kafka_training\\pyflink\\flink-sql-connector-kafka-3.4.0-1.20.jar"
     tb_env.get_config().get_configuration().set_string("pipeline.jars", "file:///" + jar_path)
 
     # create kafka source table
@@ -68,28 +73,45 @@ def streaming():
     """
     # execute
     tb_env.execute_sql(source_kafka_1)
-        # Read the table
+    # Read the table
     source_kafka_1 = tb_env.from_path('source_table_1')  # table source name
 
     # show schema
     print("+++++++++++ schema +++++++++++")
     source_kafka_1.print_schema()
 
-    # Define Tumbling Window Aggregate for every 5 second
     tumbling_window = source_kafka_1.window(Tumble.over(lit(5).seconds)
                                             .on(source_kafka_1.ts)
                                             .alias('w'))\
-                                            .group_by(col('w'),source_kafka_1.topic)\
+                                            .group_by(col('w'), source_kafka_1.topic)\
                                             .select(source_kafka_1.topic,
                                                     col('w').start.alias('window_start'),
                                                     col('w').end.alias('window_end'),
                                                     (source_kafka_1.data1).max.alias('g_data1'),
-                                                    (source_kafka_1.data2).max.alias('g_data2')
+                                                    (source_kafka_1.data2).max.alias('g_data2'),
+                                                    (source_kafka_1.data1).sum.alias('acc_data1'),
+                                                    (source_kafka_1.data2).sum.alias('acc_data2'),
+                                                    (source_kafka_1.data1 * source_kafka_1.data2).max.alias('data1xdata2')
                                                     )
-    
-    stream_env.from_collection(tumbling_window.execute().collect()).add_sink(insert_into_mssql)
-    stream_env.execute("PyFlink Streaming Job")
 
+
+    result = tumbling_window.execute().collect()
+
+    data_to_insert = []
+    for row in result:
+        topic = row[0]
+        window_start = row[1].strftime('%Y-%m-%d %H:%M:%S')
+        window_end = row[2].strftime('%Y-%m-%d %H:%M:%S')
+        g_data1 = row[3]
+        g_data2 = row[4]
+        acc_data1 = row[5]
+        acc_data2 = row[6]
+        data1xdata2 = row[7]
+
+        data_to_insert = [topic,window_start,window_end,g_data1,g_data2,acc_data1,acc_data2,data1xdata2]
+        print(data_to_insert)
+
+        insert_to_mssql(data_to_insert)
 
 def main():
     streaming()
