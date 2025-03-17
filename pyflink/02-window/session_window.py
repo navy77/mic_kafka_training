@@ -1,7 +1,7 @@
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import EnvironmentSettings,StreamTableEnvironment
 from pyflink.table.expressions import lit,col
-from pyflink.table.window import Tumble
+from pyflink.table.window import Session
 import dotenv
 import os
 
@@ -52,7 +52,7 @@ def streaming():
     source_kafka_1.print_schema()
 
     # Define Tumbling Window Aggregate for every 5 second
-    tumbling_window = source_kafka_1.window(Tumble.over(lit(5).seconds)
+    tumbling_window = source_kafka_1.window(Session.with_gap(lit(1).seconds)
                                             .on(source_kafka_1.ts)
                                             .alias('w'))\
                                             .group_by(col('w'),source_kafka_1.topic)\

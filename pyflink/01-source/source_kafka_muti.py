@@ -14,7 +14,7 @@ def streaming():
                                            environment_settings=stream_settings)
 
     # flink jar path
-    jar_path = "D:\\docker\\mic_kafka\\pyflink\\flink-sql-connector-kafka-3.4.0-1.20.jar"
+    jar_path = "E:\\mic_kafka_training\\pyflink\\flink-sql-connector-kafka-3.4.0-1.20.jar"
     tb_env.get_config().get_configuration().set_string("pipeline.jars", "file:///" + jar_path)
 
     # create kafka source table
