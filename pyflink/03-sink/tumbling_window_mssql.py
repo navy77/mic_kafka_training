@@ -94,7 +94,6 @@ def streaming():
                                                     (source_kafka_1.data1 * source_kafka_1.data2).max.alias('data1xdata2')
                                                     )
 
-
     result = tumbling_window.execute().collect()
 
     data_to_insert = []
@@ -107,7 +106,6 @@ def streaming():
         acc_data1 = row[5]
         acc_data2 = row[6]
         data1xdata2 = row[7]
-
         data_to_insert = [topic,window_start,window_end,g_data1,g_data2,acc_data1,acc_data2,data1xdata2]
         print(data_to_insert)
 
